@@ -1,9 +1,9 @@
 //> using scala "3.2.2-RC1-bin-20220909-eaa2889-NIGHTLY"
 
-import lore.task
+import lore.*
 import app.*
 
-def work(using DB, Log) = task {
+def work = task {
   log(download)
   27
 }
@@ -12,5 +12,5 @@ def work(using DB, Log) = task {
   given Log = app.Terminal
   given DB = app.DBMock
 
-  val x: Int = work
+  val x: Int = work((summon[Log], summon[DB]))
   println(x)
