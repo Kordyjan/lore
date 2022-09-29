@@ -126,16 +126,22 @@ private def contextFunction(using Quotes)(
 
   Block(defDef :: Nil, Closure(Ref(methodSymbol), None))
 
-transparent inline def taskUnwrap(inline block: Any): Unit = ${
-  taskUnwrapImpl('block)
-}
+inline def nameTypeM[T]: String = ${nameTypeMImpl[T]}
 
-private def taskUnwrapImpl(block: Expr[Any])(using Quotes) =
+def nameTypeMImpl[T: Type](using Quotes): Expr[String] =
   import quotes.reflect.*
 
-  println(block.asTerm)
-  println("***")
-  println(block.asTerm.show)
-  '{ () }
+  val res = linearize(TypeRepr.of[T]).map(_.show).mkString("(", ", ", ")")
+  Literal(StringConstant(res)).asExprOf[String]
 
-// val finalTpe = defn.FunctionClass(types.length, true, false).typeRef.appliedTo(types :+ result)
+def linearize(using Quotes)(tpe: quotes.reflect.TypeRepr): List[quotes.reflect.TypeRepr] =
+  import quotes.reflect.*
+  def rec(tpe: TypeRepr) =
+    tpe match
+      case AndType(left, right) => linearize(left) ::: linearize(right)
+      case t => t :: Nil
+  rec(tpe.dealias.simplified).sortBy(nameType)
+
+def nameType(using Quotes)(tpe: quotes.reflect.TypeRepr): String =
+  import quotes.reflect.*
+  "$" + tpe.dealias.simplified.show.replaceAll("\\.", "\\$")

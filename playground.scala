@@ -9,7 +9,7 @@ def work = taskTransform {
   27
 }
 
-@main def playground(): Unit =
+@main def playground: Unit =
   given Log = app.Terminal
   given DB = app.DBMock
 
