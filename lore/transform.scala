@@ -8,17 +8,7 @@ transparent inline def taskTransform[C, T](inline block: C ?=> T): Any = ${
 
 private def taskTransformImpl[C: Type, T: Type](block: Expr[C ?=> T])(using
     Quotes
-): Expr[Any] =
-  import quotes.reflect.*
-
-  val cls = Symbol.requiredClass("lore.Using")
-  val res = internal[C, T](block)
-
-  println(res.show)
-  println("---")
-  println(res)
-
-  res.asExpr
+): Expr[Any] = internal[C, T](block).asExpr
 
 private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
   import quotes.reflect.*

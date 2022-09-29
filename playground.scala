@@ -1,5 +1,5 @@
 //> using scala "3.nightly"
-//> using options "--explain"
+///> using options "--explain"
 
 import lore.*
 import app.*
@@ -13,5 +13,5 @@ def work = taskTransform {
   given Log = app.Terminal
   given DB = app.DBMock
 
-  val x = work
+  val x = work.run
   println(x)
