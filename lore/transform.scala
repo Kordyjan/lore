@@ -2,15 +2,23 @@ package lore
 
 import quoted.*
 
-transparent inline def task[C, T](inline block: C ?=> T): Any = ${
-  taskImpl[C, T]('{ block })
+transparent inline def taskTransform[C, T](inline block: C ?=> T): Any = ${
+  taskTransformImpl[C, T]('{ block })
 }
 
-private def taskImpl[C: Type, T: Type](block: Expr[C ?=> T])(using
+private def taskTransformImpl[C: Type, T: Type](block: Expr[C ?=> T])(using
     Quotes
 ): Expr[Any] =
-  val x = internal[C, T](block)
-  x.asExpr
+  import quotes.reflect.*
+
+  val cls = Symbol.requiredClass("lore.Using")
+  val res = internal[C, T](block)
+
+  println(res.show)
+  println("---")
+  println(res)
+
+  res.asExpr
 
 private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
   import quotes.reflect.*
@@ -64,9 +72,11 @@ private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
     BodyTransformer.transformTerm(body)(owner)
   end transformBody
 
-  object Mapper extends TreeMap:
-    override def transformTerm(tree: Term)(owner: Symbol): Term = tree match
-      case b @ Block(
+  block.asTerm match
+    case i @ Inlined(
+          _,
+          _,
+          b @ Block(
             (d @ DefDef(
               _,
               TermParamClause(par :: Nil) :: Nil,
@@ -74,21 +84,26 @@ private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
               Some(body)
             )) :: Nil,
             c @ Closure(_, _)
-          ) =>
-        val types = TypeCollector(par.symbol)
-          .foldTree(Nil, body)(Symbol.spliceOwner)
-          .distinct
+          )
+        ) =>
+      val types = TypeCollector(par.symbol)
+        .foldTree(Nil, body)(Symbol.spliceOwner)
+        .distinct
 
-        def fun = contextFunction(d.name, types, tpt.tpe)(
-          transformBody(par.symbol, d.symbol.owner, body)
-        )
-
-        fun
-      case _ =>
-        super.transformTerm(tree)(owner)
-  end Mapper
-
-  Mapper.transformTree(block.asTerm)(Symbol.spliceOwner)
+      def fun = contextFunction(d.name, types, tpt.tpe)(
+        transformBody(par.symbol, d.symbol.owner, body)
+      )
+      val tupleSymbol: Symbol = defn.TupleClass(types.length)
+      val tupleType = tupleSymbol.typeRef.appliedTo(types) // TODO: deduplicate
+      val classSymbol = Symbol.requiredClass("lore.Using")
+      val instanceType =
+        classSymbol.typeRef.appliedTo(tpt.tpe :: tupleType :: Nil)
+      New(Inferred(instanceType))
+        .select(classSymbol.primaryConstructor)
+        .appliedToTypes(tpt.tpe :: tupleType :: Nil)
+        .appliedTo(fun)
+    case t => throw AssertionError("Unsupported tree:\n" + t.show)
+end internal
 
 private def contextFunction(using Quotes)(
     name: String,
@@ -120,5 +135,17 @@ private def contextFunction(using Quotes)(
     DefDef(methodSymbol, rhs)
 
   Block(defDef :: Nil, Closure(Ref(methodSymbol), None))
+
+transparent inline def taskUnwrap(inline block: Any): Unit = ${
+  taskUnwrapImpl('block)
+}
+
+private def taskUnwrapImpl(block: Expr[Any])(using Quotes) =
+  import quotes.reflect.*
+
+  println(block.asTerm)
+  println("***")
+  println(block.asTerm.show)
+  '{ () }
 
 // val finalTpe = defn.FunctionClass(types.length, true, false).typeRef.appliedTo(types :+ result)

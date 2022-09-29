@@ -1,9 +1,10 @@
-//> using scala "3.2.2-RC1-bin-20220909-eaa2889-NIGHTLY"
+//> using scala "3.nightly"
+//> using options "--explain"
 
 import lore.*
 import app.*
 
-def work = task {
+def work = taskTransform {
   log(download)
   27
 }
@@ -12,5 +13,5 @@ def work = task {
   given Log = app.Terminal
   given DB = app.DBMock
 
-  val x: Int = work((summon[Log], summon[DB]))
+  val x = work
   println(x)
