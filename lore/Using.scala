@@ -8,11 +8,11 @@ class Using[R, -C](private val block: Any):
 def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
   import quotes.reflect.*
 
-  val args = TypeRepr.of[C].typeArgs
+  val args = linearize(TypeRepr.of[C])
   val result = TypeRepr.of[R]
 
   val symbol =
-    val names = args.zipWithIndex.map { (_, id) => "$" + id.toString }
+    val names = args.map(nameType)
     val tpe = MethodType(names)(_ => args, _ => result)
     Symbol.newMethod(Symbol.spliceOwner, "runImpl", tpe)
 
@@ -24,7 +24,7 @@ def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
         .select(tupleClass.primaryConstructor)
         .appliedToTypes(args)
         .appliedToArgs(values)
-      val preservedType = defn.FunctionClass(1).typeRef.appliedTo(TypeRepr.of[C] :: TypeRepr.of[R] :: Nil)
+      val preservedType = defn.FunctionClass(1).typeRef.appliedTo(tupleClass.typeRef.appliedTo(args) :: TypeRepr.of[R] :: Nil)
       val cast = defn.AnyClass.methodMember("asInstanceOf").head
       val applyMethod = defn.FunctionClass(1).methodMember("apply").head
       Some(block.asTerm.select(cast).appliedToType(preservedType).select(applyMethod).appliedTo(tuple))

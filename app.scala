@@ -13,4 +13,4 @@ object DBMock extends DB:
   def get(id: Int) = "0x%04x".formatted(id)
 
 object Terminal extends Log:
-  def put(msg: String): Unit = println(msg)
+  def put(msg: String): Unit = println("[log] " + msg)

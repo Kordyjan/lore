@@ -12,6 +12,7 @@ def work = taskTransform {
 @main def playground: Unit =
   given Log = app.Terminal
   given DB = app.DBMock
+  given Int = 8
 
   val x = work.run
   println(x)

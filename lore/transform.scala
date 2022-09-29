@@ -79,18 +79,18 @@ private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
       val types = TypeCollector(par.symbol)
         .foldTree(Nil, body)(Symbol.spliceOwner)
         .distinct
+        .sortBy(nameType)
 
       def fun = contextFunction(d.name, types, tpt.tpe)(
         transformBody(par.symbol, d.symbol.owner, body)
       )
-      val tupleSymbol: Symbol = defn.TupleClass(types.length)
-      val tupleType = tupleSymbol.typeRef.appliedTo(types) // TODO: deduplicate
+      val union = types.reduce(AndType(_, _)).simplified
       val classSymbol = Symbol.requiredClass("lore.Using")
       val instanceType =
-        classSymbol.typeRef.appliedTo(tpt.tpe :: tupleType :: Nil)
+        classSymbol.typeRef.appliedTo(tpt.tpe :: union :: Nil)
       New(Inferred(instanceType))
         .select(classSymbol.primaryConstructor)
-        .appliedToTypes(tpt.tpe :: tupleType :: Nil)
+        .appliedToTypes(tpt.tpe :: union :: Nil)
         .appliedTo(fun)
     case t => throw AssertionError("Unsupported tree:\n" + t.show)
 end internal
