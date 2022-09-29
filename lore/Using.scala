@@ -2,13 +2,13 @@ package lore
 
 import quoted.*
 
-class Using[R, C](private val block: C => R):
+class Using[R, -C](private val block: Any):
   transparent inline def run: Any = ${ runImpl[C, R]('{ block }) }
 
-def runImpl[C: Type, R: Type](block: Expr[C => R])(using Quotes) =
+def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
   import quotes.reflect.*
 
-  val args = block.asTerm.tpe.widen.typeArgs.head.typeArgs
+  val args = TypeRepr.of[C].typeArgs
   val result = TypeRepr.of[R]
 
   val symbol =
@@ -24,8 +24,10 @@ def runImpl[C: Type, R: Type](block: Expr[C => R])(using Quotes) =
         .select(tupleClass.primaryConstructor)
         .appliedToTypes(args)
         .appliedToArgs(values)
+      val preservedType = defn.FunctionClass(1).typeRef.appliedTo(TypeRepr.of[C] :: TypeRepr.of[R] :: Nil)
+      val cast = defn.AnyClass.methodMember("asInstanceOf").head
       val applyMethod = defn.FunctionClass(1).methodMember("apply").head
-      Some(block.asTerm.select(applyMethod).appliedTo(tuple))
+      Some(block.asTerm.select(cast).appliedToType(preservedType).select(applyMethod).appliedTo(tuple))
     DefDef(symbol, rhs)
 
   val finalTpe = defn
