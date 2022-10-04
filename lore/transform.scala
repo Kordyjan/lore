@@ -2,13 +2,9 @@ package lore
 
 import quoted.*
 
-transparent inline def taskTransform[C, T](inline block: C ?=> T): Any = ${
-  taskTransformImpl[C, T]('{ block })
-}
-
-private def taskTransformImpl[C: Type, T: Type](block: Expr[C ?=> T])(using
+def taskTransformImpl[C: Type, T: Type](block: Expr[C ?=> T])(using
     Quotes
-): Expr[Any] = internal[C, T](block).asExpr
+): Expr[T Using C] = internal[C, T](block).asExprOf[T Using C]
 
 private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
   import quotes.reflect.*
@@ -126,13 +122,36 @@ private def contextFunction(using Quotes)(
 
   Block(defDef :: Nil, Closure(Ref(methodSymbol), None))
 
-inline def nameTypeM[T]: String = ${nameTypeMImpl[T]}
-
-def nameTypeMImpl[T: Type](using Quotes): Expr[String] =
+def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
   import quotes.reflect.*
 
-  val res = linearize(TypeRepr.of[T]).map(_.show).mkString("(", ", ", ")")
-  Literal(StringConstant(res)).asExprOf[String]
+  val args = linearize(TypeRepr.of[C])
+  val result = TypeRepr.of[R]
+
+  val symbol =
+    val names = args.map(nameType)
+    val tpe = MethodType(names)(_ => args, _ => result)
+    Symbol.newMethod(Symbol.spliceOwner, "runImpl", tpe)
+
+  val defDef =
+    def rhs(params: List[List[Tree]]): Option[Term] =
+      val values = params.head.collect { case t: Term => t }
+      val tupleClass = defn.TupleClass(args.length)
+      val tuple = New(Inferred(tupleClass.typeRef))
+        .select(tupleClass.primaryConstructor)
+        .appliedToTypes(args)
+        .appliedToArgs(values)
+      val preservedType = defn.FunctionClass(1).typeRef.appliedTo(tupleClass.typeRef.appliedTo(args) :: TypeRepr.of[R] :: Nil)
+      val cast = defn.AnyClass.methodMember("asInstanceOf").head
+      val applyMethod = defn.FunctionClass(1).methodMember("apply").head
+      Some(block.asTerm.select(cast).appliedToType(preservedType).select(applyMethod).appliedTo(tuple))
+    DefDef(symbol, rhs)
+
+  val finalTpe = defn
+    .FunctionClass(args.length, true, false)
+    .typeRef
+    .appliedTo(args :+ result)
+  Block(defDef :: Nil, Closure(Ref(symbol), Some(finalTpe))).asExpr
 
 def linearize(using Quotes)(tpe: quotes.reflect.TypeRepr): List[quotes.reflect.TypeRepr] =
   import quotes.reflect.*
