@@ -78,13 +78,16 @@ private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes): quot
         .foldTree(Nil, body)(Symbol.spliceOwner)
         .distinct
         .sortBy(nameType)
+      val names = types.map(nameType).map(n => Literal(StringConstant(n)))
 
       def fun = contextFunction(d.name, types, tpt.tpe)(
         transformBody(par.symbol, d.symbol.owner, body)
       )
+      def signature = EList(TypeRepr.of[String]).createInstance(names)
+
       val union = types.reduce(AndType(_, _)).simplified
       val usingClass = EClass.of("lore.Using", tpt.tpe :: union :: Nil)
-      usingClass.createInstance(fun :: Nil)
+      usingClass.createInstance(fun :: signature :: Nil)
     case t => throw AssertionError("Unsupported tree:\n" + t.show)
 end internal
 
@@ -101,26 +104,26 @@ private def contextFunction(using Quotes)(
   val ext = extend
   import ext.*
 
-  val rawTuple = ETuple.ofAny(types.length)
+  val rawList = EList(defn.AnyClass.typeRef)
 
   val methodSymbol =
     val tpe =
-      MethodType("$contextTuple" :: Nil)(_ => rawTuple.typeRef :: Nil, _ => result)
+      MethodType("$contextTuple" :: Nil)(_ => rawList.typeRef :: Nil, _ => result)
     Symbol.newMethod(Symbol.spliceOwner, name, tpe)
 
   val defDef =
     def rhs(params: List[List[Tree]]): Option[Term] =
       def resolver(t: TypeRepr) =
         val param = params.head.collectFirst { case t: Term => t }.get
-        val idx = types.indexWhere(_ =:= t.widen) + 1
-        val accessor = rawTuple.cls.methodMember(s"_$idx").head
-        param.select(accessor).cast(t)
+        val idx = types.indexWhere(_ =:= t.widen)
+        val accessor = rawList.cls.methodMember("apply").head
+        param.select(accessor).appliedTo(Literal(IntConstant(idx))).cast(t)
       Some(body(resolver))
     DefDef(methodSymbol, rhs)
 
   Block(defDef :: Nil, Closure(Ref(methodSymbol), None))
 
-def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
+def runImpl[C: Type, R: Type](block: Expr[Any], signature: Expr[List[String]])(using Quotes) =
   import quotes.reflect.*
   val ext = extend
   import ext.*
@@ -136,12 +139,24 @@ def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
   val defDef =
     def rhs(params: List[List[Tree]]): Option[Term] =
       val values = params.head.collect { case t: Term => t }
-      val rawTuple = ETuple.ofAny(args.length)
-      val tupleClass = defn.TupleClass(args.length)
-      val tuple = rawTuple.createInstance(values)
-      val preservedType = defn.FunctionClass(1).typeRef.appliedTo(tupleClass.typeRef.appliedTo(args) :: TypeRepr.of[R] :: Nil)
-      val applyMethod = defn.FunctionClass(1).methodMember("apply").head
-      Some(block.asTerm.cast(preservedType).select(applyMethod).appliedTo(tuple))
+      val pairs = args.map(nameType).map(n => Literal(StringConstant(n))).zip(values)
+      val rawList = EList(defn.AnyClass.typeRef)
+
+      val emap = EMap(TypeRepr.of[String], defn.AnyClass.typeRef)
+      val mapInstance = emap.createInstance(pairs)
+      val mapSymbol = Symbol.newVal(symbol, "givenMap", emap.typeRef, Flags.EmptyFlags, symbol)
+      val mapVal = ValDef(mapSymbol, Some(mapInstance))
+      val list = signature.asTerm.select(rawList.cls.methodMember("map").head).appliedToType(defn.AnyClass.typeRef)
+        .appliedTo(Ref(mapSymbol).select(emap.cls.methodMember("apply").head).etaExpand(symbol))
+
+      val function = EFunction.of(rawList.typeRef :: Nil, TypeRepr.of[R])
+      val applyMethod = function.cls.methodMember("apply").head
+      Some(
+        Block(
+          mapVal :: Nil,
+          block.asTerm.cast(function.typeRef).select(applyMethod).appliedTo(list)
+        )
+      )
     DefDef(symbol, rhs)
 
   val finalTpe = defn

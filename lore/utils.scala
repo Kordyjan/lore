@@ -7,6 +7,12 @@ def extend(using q: Quotes) = QuotesUtils[q.type]
 class QuotesUtils[Q <: Quotes](using val q: Q):
   import q.reflect.*
 
+  def varargs(tpe: TypeRepr)(values: List[Term]): Term =
+    Typed(
+      Repeated(values, Inferred(tpe)),
+      Inferred(EClass(defn.RepeatedParamClass, tpe :: Nil).typeRef)
+    )
+
   extension (term: Term) def cast(tpe: TypeRepr): Term =
     val method = defn.AnyClass.methodMember("asInstanceOf").head
     term.select(method).appliedToType(tpe)
@@ -32,3 +38,26 @@ class QuotesUtils[Q <: Quotes](using val q: Q):
         .select(cls.primaryConstructor)
         .appliedToTypes(tpes)
         .appliedToArgs(params)
+
+  class EList(tpe: TypeRepr):
+    val cls = Symbol.requiredClass("scala.collection.immutable.List")
+    val companion = cls.companionModule
+    lazy val ctorTypeRef = cls.typeRef
+    lazy val typeRef = ctorTypeRef.appliedTo(tpe)
+
+    def createInstance(params: List[Term]): Term =
+      Ref(companion).select(companion.methodMember("apply").head).appliedToType(tpe).appliedTo(varargs(tpe)(params))
+
+  class EMap(keyTpe: TypeRepr, valTpe: TypeRepr):
+    val cls = Symbol.requiredClass("scala.collection.immutable.Map")
+    val companion = cls.companionModule
+    lazy val ctorTypeRef = cls.typeRef
+    lazy val typeRef = ctorTypeRef.appliedTo(keyTpe :: valTpe :: Nil)
+
+    def createInstance(params: List[(Term, Term)]): Term =
+      val tuple = ETuple.of(keyTpe :: valTpe :: Nil)
+      val pairs = params.map { case (k, v) =>
+        tuple.createInstance(k :: v :: Nil)
+      }
+      Ref(companion).select(companion.methodMember("apply").head).appliedToTypes(keyTpe :: valTpe :: Nil)
+        .appliedTo(varargs(tuple.typeRef)(pairs))
