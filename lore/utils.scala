@@ -16,6 +16,9 @@ class QuotesUtils[Q <: Quotes](using val q: Q):
     def ofAny(size: Int) = fill(size)(defn.AnyClass.typeRef)
     def of(tpes: List[TypeRepr]) = EClass(defn.TupleClass(tpes.length), tpes)
 
+  object EFunction:
+    def of(tpes: List[TypeRepr], ret: TypeRepr) = EClass(defn.FunctionClass(tpes.length), tpes :+ ret)
+
   object EClass:
     def of(path: String, tpes: List[TypeRepr] = Nil): EClass =
       EClass(Symbol.requiredClass(path), tpes)

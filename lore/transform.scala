@@ -83,7 +83,7 @@ private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes): quot
         transformBody(par.symbol, d.symbol.owner, body)
       )
       val union = types.reduce(AndType(_, _)).simplified
-      val usingClass = EClass.of("lore.Using")
+      val usingClass = EClass.of("lore.Using", tpt.tpe :: union :: Nil)
       usingClass.createInstance(fun :: Nil)
     case t => throw AssertionError("Unsupported tree:\n" + t.show)
 end internal
@@ -98,13 +98,14 @@ private def contextFunction(using Quotes)(
     ) => quotes.reflect.Term
 ): quotes.reflect.Term =
   import quotes.reflect.*
+  val ext = extend
+  import ext.*
 
-  val tupleSymbol: Symbol = defn.TupleClass(types.length)
-  val tupleType = tupleSymbol.typeRef.appliedTo(types)
+  val rawTuple = ETuple.ofAny(types.length)
 
   val methodSymbol =
     val tpe =
-      MethodType("$contextTuple" :: Nil)(_ => tupleType :: Nil, _ => result)
+      MethodType("$contextTuple" :: Nil)(_ => rawTuple.typeRef :: Nil, _ => result)
     Symbol.newMethod(Symbol.spliceOwner, name, tpe)
 
   val defDef =
@@ -112,8 +113,8 @@ private def contextFunction(using Quotes)(
       def resolver(t: TypeRepr) =
         val param = params.head.collectFirst { case t: Term => t }.get
         val idx = types.indexWhere(_ =:= t.widen) + 1
-        val accessor = tupleSymbol.methodMember(s"_$idx").head
-        param.select(accessor)
+        val accessor = rawTuple.cls.methodMember(s"_$idx").head
+        param.select(accessor).cast(t)
       Some(body(resolver))
     DefDef(methodSymbol, rhs)
 
@@ -135,11 +136,9 @@ def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
   val defDef =
     def rhs(params: List[List[Tree]]): Option[Term] =
       val values = params.head.collect { case t: Term => t }
+      val rawTuple = ETuple.ofAny(args.length)
       val tupleClass = defn.TupleClass(args.length)
-      val tuple = New(Inferred(tupleClass.typeRef))
-        .select(tupleClass.primaryConstructor)
-        .appliedToTypes(args)
-        .appliedToArgs(values)
+      val tuple = rawTuple.createInstance(values)
       val preservedType = defn.FunctionClass(1).typeRef.appliedTo(tupleClass.typeRef.appliedTo(args) :: TypeRepr.of[R] :: Nil)
       val applyMethod = defn.FunctionClass(1).methodMember("apply").head
       Some(block.asTerm.cast(preservedType).select(applyMethod).appliedTo(tuple))
