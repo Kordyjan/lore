@@ -6,8 +6,10 @@ def taskTransformImpl[C: Type, T: Type](block: Expr[C ?=> T])(using
     Quotes
 ): Expr[T Using C] = internal[C, T](block).asExprOf[T Using C]
 
-private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
+private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes): quotes.reflect.Term =
   import quotes.reflect.*
+  val ext = extend
+  import ext.*
 
   class TypeCollector(productEvidence: Symbol)
       extends TreeAccumulator[List[TypeRepr]]:
@@ -81,13 +83,8 @@ private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes) =
         transformBody(par.symbol, d.symbol.owner, body)
       )
       val union = types.reduce(AndType(_, _)).simplified
-      val classSymbol = Symbol.requiredClass("lore.Using")
-      val instanceType =
-        classSymbol.typeRef.appliedTo(tpt.tpe :: union :: Nil)
-      New(Inferred(instanceType))
-        .select(classSymbol.primaryConstructor)
-        .appliedToTypes(tpt.tpe :: union :: Nil)
-        .appliedTo(fun)
+      val usingClass = EClass.of("lore.Using")
+      usingClass.createInstance(fun :: Nil)
     case t => throw AssertionError("Unsupported tree:\n" + t.show)
 end internal
 
@@ -124,6 +121,8 @@ private def contextFunction(using Quotes)(
 
 def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
   import quotes.reflect.*
+  val ext = extend
+  import ext.*
 
   val args = linearize(TypeRepr.of[C])
   val result = TypeRepr.of[R]
@@ -142,9 +141,8 @@ def runImpl[C: Type, R: Type](block: Expr[Any])(using Quotes) =
         .appliedToTypes(args)
         .appliedToArgs(values)
       val preservedType = defn.FunctionClass(1).typeRef.appliedTo(tupleClass.typeRef.appliedTo(args) :: TypeRepr.of[R] :: Nil)
-      val cast = defn.AnyClass.methodMember("asInstanceOf").head
       val applyMethod = defn.FunctionClass(1).methodMember("apply").head
-      Some(block.asTerm.select(cast).appliedToType(preservedType).select(applyMethod).appliedTo(tuple))
+      Some(block.asTerm.cast(preservedType).select(applyMethod).appliedTo(tuple))
     DefDef(symbol, rhs)
 
   val finalTpe = defn
