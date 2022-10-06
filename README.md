@@ -7,6 +7,9 @@ It is untested, unstable, probably bugged, but it works...
 
 ## Running
 
+Use [scala-cli](https://scala-cli.virtuslab.org/)
+
+
 ```bash
 scala-cli .
 ```
