@@ -1,3 +1,5 @@
+//> using lib "com.lihaoyi::pprint:0.8.0"
+
 package lore
 
 import quoted.*
@@ -14,6 +16,6 @@ def bebug(using Quotes)(arg: quotes.reflect.TypeRepr): Unit =
 
 @targetName("bebugTree") def bebug(using Quotes)(arg: quotes.reflect.Tree): Unit =
   println("***")
-  println(arg)
+  pprint.log(arg)
   println("<->")
   println(arg.show)
