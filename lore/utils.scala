@@ -13,9 +13,11 @@ class QuotesUtils[Q <: Quotes](using val q: Q):
       Inferred(EClass(defn.RepeatedParamClass, tpe :: Nil).typeRef)
     )
 
-  extension (term: Term) def cast(tpe: TypeRepr): Term =
-    val method = defn.AnyClass.methodMember("asInstanceOf").head
-    term.select(method).appliedToType(tpe)
+  extension (term: Term)
+
+    def cast(tpe: TypeRepr): Term =
+      val method = defn.AnyClass.methodMember("asInstanceOf").head
+      term.select(method).appliedToType(tpe)
 
   object ETuple:
     def fill(size: Int)(tpe: => TypeRepr) = of(List.fill(size)(tpe))
@@ -23,7 +25,8 @@ class QuotesUtils[Q <: Quotes](using val q: Q):
     def of(tpes: List[TypeRepr]) = EClass(defn.TupleClass(tpes.length), tpes)
 
   object EFunction:
-    def of(tpes: List[TypeRepr], ret: TypeRepr) = EClass(defn.FunctionClass(tpes.length), tpes :+ ret)
+    def of(tpes: List[TypeRepr], ret: TypeRepr) =
+      EClass(defn.FunctionClass(tpes.length), tpes :+ ret)
 
   object EClass:
     def of(path: String, tpes: List[TypeRepr] = Nil): EClass =
@@ -46,7 +49,10 @@ class QuotesUtils[Q <: Quotes](using val q: Q):
     lazy val typeRef = ctorTypeRef.appliedTo(tpe)
 
     def createInstance(params: List[Term]): Term =
-      Ref(companion).select(companion.methodMember("apply").head).appliedToType(tpe).appliedTo(varargs(tpe)(params))
+      Ref(companion)
+        .select(companion.methodMember("apply").head)
+        .appliedToType(tpe)
+        .appliedTo(varargs(tpe)(params))
 
   class EMap(keyTpe: TypeRepr, valTpe: TypeRepr):
     val cls = Symbol.requiredClass("scala.collection.immutable.Map")
@@ -59,5 +65,7 @@ class QuotesUtils[Q <: Quotes](using val q: Q):
       val pairs = params.map { case (k, v) =>
         tuple.createInstance(k :: v :: Nil)
       }
-      Ref(companion).select(companion.methodMember("apply").head).appliedToTypes(keyTpe :: valTpe :: Nil)
+      Ref(companion)
+        .select(companion.methodMember("apply").head)
+        .appliedToTypes(keyTpe :: valTpe :: Nil)
         .appliedTo(varargs(tuple.typeRef)(pairs))

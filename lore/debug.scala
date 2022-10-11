@@ -14,7 +14,9 @@ def bebug(using Quotes)(arg: quotes.reflect.TypeRepr): Unit =
   println("<->")
   println(arg.show)
 
-@targetName("bebugTree") def bebug(using Quotes)(arg: quotes.reflect.Tree): Unit =
+@targetName("bebugTree") def bebug(using Quotes)(
+    arg: quotes.reflect.Tree
+): Unit =
   println("***")
   pprint.log(arg)
   println("<->")

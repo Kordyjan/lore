@@ -6,7 +6,9 @@ def taskTransformImpl[C: Type, T: Type](block: Expr[C ?=> T])(using
     Quotes
 ): Expr[T Using C] = internal[C, T](block).asExprOf[T Using C]
 
-private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using Quotes): quotes.reflect.Term =
+private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using
+    Quotes
+): quotes.reflect.Term =
   import quotes.reflect.*
   val ext = extend
   import ext.*
@@ -108,7 +110,10 @@ private def contextFunction(using Quotes)(
 
   val methodSymbol =
     val tpe =
-      MethodType("$contextTuple" :: Nil)(_ => rawList.typeRef :: Nil, _ => result)
+      MethodType("$contextTuple" :: Nil)(
+        _ => rawList.typeRef :: Nil,
+        _ => result
+      )
     Symbol.newMethod(Symbol.spliceOwner, name, tpe)
 
   val defDef =
@@ -123,7 +128,9 @@ private def contextFunction(using Quotes)(
 
   Block(defDef :: Nil, Closure(Ref(methodSymbol), None))
 
-def runImpl[C: Type, R: Type](block: Expr[Any], signature: Expr[List[String]])(using Quotes) =
+def runImpl[C: Type, R: Type](block: Expr[Any], signature: Expr[List[String]])(
+    using Quotes
+) =
   import quotes.reflect.*
   val ext = extend
   import ext.*
@@ -139,22 +146,38 @@ def runImpl[C: Type, R: Type](block: Expr[Any], signature: Expr[List[String]])(u
   val defDef =
     def rhs(params: List[List[Tree]]): Option[Term] =
       val values = params.head.collect { case t: Term => t }
-      val pairs = args.map(nameType).map(n => Literal(StringConstant(n))).zip(values)
+      val pairs =
+        args.map(nameType).map(n => Literal(StringConstant(n))).zip(values)
       val rawList = EList(defn.AnyClass.typeRef)
 
       val emap = EMap(TypeRepr.of[String], defn.AnyClass.typeRef)
       val mapInstance = emap.createInstance(pairs)
-      val mapSymbol = Symbol.newVal(symbol, "givenMap", emap.typeRef, Flags.EmptyFlags, symbol)
+      val mapSymbol = Symbol.newVal(
+        symbol,
+        "givenMap",
+        emap.typeRef,
+        Flags.EmptyFlags,
+        symbol
+      )
       val mapVal = ValDef(mapSymbol, Some(mapInstance))
-      val list = signature.asTerm.select(rawList.cls.methodMember("map").head).appliedToType(defn.AnyClass.typeRef)
-        .appliedTo(Ref(mapSymbol).select(emap.cls.methodMember("apply").head).etaExpand(symbol))
+      val list = signature.asTerm
+        .select(rawList.cls.methodMember("map").head)
+        .appliedToType(defn.AnyClass.typeRef)
+        .appliedTo(
+          Ref(mapSymbol)
+            .select(emap.cls.methodMember("apply").head)
+            .etaExpand(symbol)
+        )
 
       val function = EFunction.of(rawList.typeRef :: Nil, TypeRepr.of[R])
       val applyMethod = function.cls.methodMember("apply").head
       Some(
         Block(
           mapVal :: Nil,
-          block.asTerm.cast(function.typeRef).select(applyMethod).appliedTo(list)
+          block.asTerm
+            .cast(function.typeRef)
+            .select(applyMethod)
+            .appliedTo(list)
         )
       )
     DefDef(symbol, rhs)
@@ -165,12 +188,14 @@ def runImpl[C: Type, R: Type](block: Expr[Any], signature: Expr[List[String]])(u
     .appliedTo(args :+ result)
   Block(defDef :: Nil, Closure(Ref(symbol), Some(finalTpe))).asExpr
 
-def linearize(using Quotes)(tpe: quotes.reflect.TypeRepr): List[quotes.reflect.TypeRepr] =
+def linearize(using Quotes)(
+    tpe: quotes.reflect.TypeRepr
+): List[quotes.reflect.TypeRepr] =
   import quotes.reflect.*
   def rec(tpe: TypeRepr) =
     tpe match
       case AndType(left, right) => linearize(left) ::: linearize(right)
-      case t => t :: Nil
+      case t                    => t :: Nil
   rec(tpe.dealias.simplified).sortBy(nameType)
 
 def nameType(using Quotes)(tpe: quotes.reflect.TypeRepr): String =

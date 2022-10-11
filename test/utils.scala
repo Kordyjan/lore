@@ -1,6 +1,6 @@
 //> using lib "org.scalameta::munit:0.7.29"
 
-package tests
+package test
 package utils
 
 trait A:
@@ -16,7 +16,7 @@ trait B:
   def b: String
 
 object B:
-  def apply(_b: String):B = new:
+  def apply(_b: String): B = new:
     val b = _b
 
 def obtainB(using B) = summon[B].b
