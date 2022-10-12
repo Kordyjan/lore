@@ -1,4 +1,4 @@
-//> using lib "org.scalameta::munit:0.7.29"
+//> using lib "com.lihaoyi::utest:0.7.10"
 
 package test
 package utils
