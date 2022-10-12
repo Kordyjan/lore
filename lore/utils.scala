@@ -1,6 +1,7 @@
 package lore
 
 import quoted.*
+import language.experimental.fewerBraces
 
 def extend(using q: Quotes) = QuotesUtils[q.type]
 
@@ -62,9 +63,9 @@ class QuotesUtils[Q <: Quotes](using val q: Q):
 
     def createInstance(params: List[(Term, Term)]): Term =
       val tuple = ETuple.of(keyTpe :: valTpe :: Nil)
-      val pairs = params.map { case (k, v) =>
+      val pairs = params.map: (k, v) =>
         tuple.createInstance(k :: v :: Nil)
-      }
+
       Ref(companion)
         .select(companion.methodMember("apply").head)
         .appliedToTypes(keyTpe :: valTpe :: Nil)
