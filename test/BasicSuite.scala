@@ -67,3 +67,13 @@ class BasicSuite extends munit.FunSuite with CompilationAssertions:
       given B = B("xyz")
       val res = work2.run
       assertEquals(res, "xyz5")
+
+    test("flatMap compiles"):
+      val work1 = task:
+        obtainA + obtainB
+
+      val work2 = work1.flatMap: _ =>
+        task:
+          obtainC
+
+      assertCompiles("summon[work2.type <:< (Unit Using A & B & C)]")

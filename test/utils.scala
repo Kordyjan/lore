@@ -27,3 +27,12 @@ object C:
   def apply(): C = new {}
 
 def obtainC(using C): Unit = summon[C]
+
+trait D:
+  def d: Double
+
+object D:
+  def apply(_d: Double): D = new:
+    val d = _d
+
+def obtainD(using D): Double = summon[D].d
