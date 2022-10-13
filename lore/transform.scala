@@ -123,7 +123,7 @@ private def contextFunction(using Quotes)(
         val idx = types.indexWhere(_ =:= t.widen)
         val accessor = rawList.cls.methodMember("apply").head
         param.select(accessor).appliedTo(Literal(IntConstant(idx))).cast(t)
-      Some(body(resolver))
+      Some(body(resolver).changeOwner(methodSymbol))
     DefDef(methodSymbol, rhs)
 
   Block(defDef :: Nil, Closure(Ref(methodSymbol), None))

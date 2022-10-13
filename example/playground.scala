@@ -1,6 +1,6 @@
 //> using scala "3.2.2-RC1-bin-20221009-2052fc2-NIGHTLY" /* "3.nightly" */
 ///> using options "--explain"
-///> using options "-Xcheck-macros", "-Ycheck:all"
+///> using options "-Xcheck-macros"
 
 import lore.*
 import app.*
