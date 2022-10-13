@@ -87,7 +87,7 @@ private def internal[C: Type, T: Type](block: Expr[C ?=> T])(using
       )
       def signature = EList(TypeRepr.of[String]).createInstance(names)
 
-      val union = types.reduce(AndType(_, _)).simplified
+      val union = types.foldRight[TypeRepr](defn.AnyClass.typeRef)(AndType(_, _)).simplified
       val usingClass = EClass.of("lore.Using", tpt.tpe :: union :: Nil)
       usingClass.createInstance(fun :: signature :: Nil)
     case t => throw AssertionError("Unsupported tree:\n" + t.show)
@@ -196,7 +196,8 @@ def linearize(using Quotes)(
     tpe match
       case AndType(left, right) => linearize(left) ::: linearize(right)
       case t                    => t :: Nil
-  rec(tpe.dealias.simplified).sortBy(nameType)
+  if tpe =:= defn.AnyClass.typeRef then Nil else
+    rec(tpe.dealias.simplified).sortBy(nameType)
 
 def nameType(using Quotes)(tpe: quotes.reflect.TypeRepr): String =
   import quotes.reflect.*

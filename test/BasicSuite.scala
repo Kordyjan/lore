@@ -25,10 +25,12 @@ class BasicSuite extends munit.FunSuite with CompilationAssertions:
       given A = A(5)
       assertError("work.run", "No given instance of type test.utils.B")
 
-    test("part of context can be locally eliminated"):
+    test("part of context locally eliminated"):
       val work = task:
         given A = A(7)
         obtainB + obtainA
+
+      assertCompiles("summon[work.type <:< (String Using B)]")
 
       val res =
         given A = A(5)
@@ -36,3 +38,32 @@ class BasicSuite extends munit.FunSuite with CompilationAssertions:
         work.run
 
       assertEquals(res, "test7")
+
+    test("entire context locally eliminated"):
+      val work = task:
+        given A = A(7)
+        given B = B("abc")
+        obtainB + obtainA
+
+      assertCompiles("summon[work.type <:< (String Using Any)]")
+
+      val res =
+        given A = A(5)
+        given B = B("test")
+        work.run
+
+      assertEquals(res, "abc7")
+
+    test("context can be partially eliminated"):
+      val work = task:
+        obtainB + obtainA
+
+      val work2 = task:
+        given A = A(5)
+        work.run
+
+      assertCompiles("summon[work2.type <:< (String Using B)]")
+
+      given B = B("xyz")
+      val res = work2.run
+      assertEquals(res, "xyz5")
